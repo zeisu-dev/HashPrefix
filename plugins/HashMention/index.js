@@ -14,12 +14,13 @@
 
         const content = message.content;
 
-        if (content.startsWith("# ")) {
-            message.content = `# <@${TARGET_USER_ID}> ${content.slice(2)}`;
-        } else if (content.startsWith("#")) {
-            message.content = `# <@${TARGET_USER_ID}> ${content.slice(1).replace(/^ +/, "")}`;
-        } else {
-            message.content = `# <@${TARGET_USER_ID}> ${content}`;
-        }
+        message.content = `# <@${TARGET_USER_ID}> ${content}`;
+
+        message.mentions = [
+            ...(message.mentions || []),
+            {
+                id: String(TARGET_USER_ID)
+            }
+        ];
     });
 })();
