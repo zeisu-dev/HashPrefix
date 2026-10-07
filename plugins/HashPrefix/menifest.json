@@ -1,1 +1,11 @@
-
+{
+  "name": "HashPrefix",
+  "description": "Automatically adds # before Discord messages",
+  "authors": [
+    {
+      "name": "zeisu"
+    }
+  ],
+  "main": "index.js",
+  "hash": "e3dc636c4c3f3535"
+}
