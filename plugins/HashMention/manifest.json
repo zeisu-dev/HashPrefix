@@ -1,0 +1,10 @@
+{
+  "name": "HashMention",
+  "description": "Automatically adds # and mentions a selected user before messages",
+  "authors": [
+    {
+      "name": "zeisu"
+    }
+  ],
+  "main": "index.js"
+}
