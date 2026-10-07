@@ -5,7 +5,7 @@
 
     if (!MessageActions?.sendMessage) return;
 
-    const TARGET_USER_ID = "USER_ID_HERE";
+    const TARGET_USER_ID = "1342058450829447211";
 
     patcher.before("sendMessage", MessageActions, (args) => {
         const message = args?.[1];
