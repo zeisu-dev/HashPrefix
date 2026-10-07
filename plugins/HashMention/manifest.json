@@ -1,6 +1,6 @@
 {
   "name": "HashMention",
-  "description": "Automatically adds # and mentions a selected user before messages",
+  "description": "Automatically adds # before Discord messages",
   "authors": [
     {
       "name": "zeisu"
