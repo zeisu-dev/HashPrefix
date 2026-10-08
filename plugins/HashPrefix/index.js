@@ -1,202 +1,232 @@
-(() => {
-    const { patcher, metro, storage } = vendetta;
+import { before } from "@revenge-mod/patcher";
+import { findByProps } from "@revenge-mod/modules";
+import { plugin } from "@revenge-mod/plugins";
 
-    const MessageActions = metro.findByProps("sendMessage");
+interface Settings {
+    enableHash: boolean;
+    enableMentions: boolean;
+    icons: string;
+    iconChance: number;
+}
 
-    if (!MessageActions?.sendMessage) return;
+const defaultSettings: Settings = {
+    enableHash: true,
+    enableMentions: true,
+    icons: "😭, 😂, 🤣, 🥺, 🤔",
+    iconChance: 30,
+};
 
-    const STORAGE_KEY = "HotTypingZeisu";
+function getRandomIcon(settings: Settings): string {
+    const chance = Math.max(
+        0,
+        Math.min(100, Number(settings.iconChance) || 0)
+    );
 
-    const defaultConfig = {
-        enableHash: true,
-        enableMentions: true,
-        icons: "😭, 😂, 🤣, 🥺, 🤔",
-        iconChance: 30
-    };
-
-    let config = { ...defaultConfig };
-    let targetUserIds = [];
-
-    // ================================
-    // LOAD / SAVE CONFIG
-    // ================================
-
-    async function loadConfig() {
-        try {
-            const saved = await storage.get(STORAGE_KEY);
-
-            if (saved) {
-                config = {
-                    ...defaultConfig,
-                    ...saved
-                };
-            }
-        } catch (_) {}
+    if (Math.random() * 100 >= chance) {
+        return "";
     }
 
-    async function saveConfig() {
-        try {
-            await storage.set(STORAGE_KEY, config);
-        } catch (_) {}
+    const icons = settings.icons
+        .split(",")
+        .map(icon => icon.trim())
+        .filter(Boolean);
+
+    if (icons.length === 0) {
+        return "";
     }
 
-    loadConfig();
+    return " " + icons[Math.floor(Math.random() * icons.length)];
+}
 
-    // ================================
-    // RANDOM ICON
-    // ================================
+export default plugin({
+    name: "HotTypingZeisu",
+    description:
+        "Adds a customizable # prefix, automatic mentions and random icons.",
 
-    function getRandomIcon() {
-        const chance = Math.max(
-            0,
-            Math.min(100, Number(config.iconChance) || 0)
+    authors: [
+        {
+            name: "zeisu",
+            id: "0",
+        },
+    ],
+
+    jsonStorage: {
+        load: true,
+        default: defaultSettings,
+        file: "storage.json",
+    },
+
+    start({ jsonStorage, cleanup }) {
+        const MessageActions = findByProps("sendMessage");
+
+        if (!MessageActions?.sendMessage) {
+            return;
+        }
+
+        let targetUserIds: string[] = [];
+
+        cleanup(
+            before(MessageActions, "sendMessage", (args) => {
+                const message = args?.[1];
+
+                if (!message?.content) {
+                    return args;
+                }
+
+                const settings = jsonStorage.cache ?? defaultSettings;
+                const content = message.content;
+
+                const prefix = settings.enableHash ? "# " : "";
+
+                // Auto Mentions OFF
+                if (!settings.enableMentions) {
+                    message.content =
+                        prefix +
+                        content +
+                        getRandomIcon(settings);
+
+                    return args;
+                }
+
+                // Find mentions
+                const mentions = [
+                    ...content.matchAll(/<@!?(\d+)>/g),
+                ];
+
+                // New mentions
+                if (mentions.length > 0) {
+                    targetUserIds = [
+                        ...new Set(
+                            mentions.map(match => match[1])
+                        ),
+                    ];
+
+                    const cleanContent = content
+                        .replace(/<@!?\d+>/g, "")
+                        .replace(/\s+/g, " ")
+                        .trim();
+
+                    const targets = targetUserIds
+                        .map(id => `<@${id}>`)
+                        .join(" ");
+
+                    message.content =
+                        prefix +
+                        cleanContent +
+                        " " +
+                        targets +
+                        getRandomIcon(settings);
+
+                    return args;
+                }
+
+                // Remembered mentions
+                if (targetUserIds.length > 0) {
+                    const targets = targetUserIds
+                        .map(id => `<@${id}>`)
+                        .join(" ");
+
+                    message.content =
+                        prefix +
+                        content +
+                        " " +
+                        targets +
+                        getRandomIcon(settings);
+
+                    return args;
+                }
+
+                // Normal message
+                message.content =
+                    prefix +
+                    content +
+                    getRandomIcon(settings);
+
+                return args;
+            })
         );
+    },
 
-        if (Math.random() * 100 >= chance) {
-            return "";
-        }
+    SettingsComponent({ api }) {
+        const settings =
+            api.jsonStorage.use() ?? defaultSettings;
 
-        const iconList = String(config.icons || "")
-            .split(",")
-            .map(icon => icon.trim())
-            .filter(Boolean);
+        const update = (changes: Partial<Settings>) => {
+            api.jsonStorage.set(changes);
+        };
 
-        if (iconList.length === 0) {
-            return "";
-        }
-
-        const icon =
-            iconList[Math.floor(Math.random() * iconList.length)];
-
-        return " " + icon;
-    }
-
-    // ================================
-    // BUILD MESSAGE
-    // ================================
-
-    function buildMessage(content, targets = "") {
-        const prefix = config.enableHash ? "# " : "";
+        const { View, Text, Switch, TextInput } =
+            api.unscoped.react.native;
 
         return (
-            prefix +
-            content +
-            (targets ? " " + targets : "") +
-            getRandomIcon()
+            <View
+                style={{
+                    padding: 16,
+                    gap: 16,
+                }}
+            >
+                <View>
+                    <Text>Enable #</Text>
+
+                    <Switch
+                        value={settings.enableHash}
+                        onValueChange={value =>
+                            update({
+                                enableHash: value,
+                            })
+                        }
+                    />
+                </View>
+
+                <View>
+                    <Text>Auto Mentions</Text>
+
+                    <Switch
+                        value={settings.enableMentions}
+                        onValueChange={value =>
+                            update({
+                                enableMentions: value,
+                            })
+                        }
+                    />
+                </View>
+
+                <View>
+                    <Text>Icons</Text>
+
+                    <TextInput
+                        value={settings.icons}
+                        onChangeText={value =>
+                            update({
+                                icons: value,
+                            })
+                        }
+                        placeholder="😭, 😂, 🤣, 🥺, 🤔"
+                    />
+                </View>
+
+                <View>
+                    <Text>Icon Chance (%)</Text>
+
+                    <TextInput
+                        value={String(settings.iconChance)}
+                        keyboardType="numeric"
+                        onChangeText={value => {
+                            const number = Math.max(
+                                0,
+                                Math.min(
+                                    100,
+                                    Number(value) || 0
+                                )
+                            );
+
+                            update({
+                                iconChance: number,
+                            });
+                        }}
+                    />
+                </View>
+            </View>
         );
-    }
-
-    // ================================
-    // SEND MESSAGE PATCH
-    // ================================
-
-    patcher.before("sendMessage", MessageActions, (args) => {
-        const message = args?.[1];
-
-        if (!message?.content) return;
-
-        const content = message.content;
-
-        // --------------------------------
-        // MENTION SYSTEM OFF
-        // --------------------------------
-
-        if (!config.enableMentions) {
-            message.content = buildMessage(content);
-            return;
-        }
-
-        // --------------------------------
-        // FIND MENTIONS
-        // --------------------------------
-
-        const mentions = [
-            ...content.matchAll(/<@!?(\d+)>/g)
-        ];
-
-        // --------------------------------
-        // NEW MENTIONS
-        // --------------------------------
-
-        if (mentions.length > 0) {
-            targetUserIds = [
-                ...new Set(
-                    mentions.map(match => match[1])
-                )
-            ];
-
-            // Remove mentions from original position
-            const cleanContent = content
-                .replace(/<@!?\d+>/g, "")
-                .replace(/\s+/g, " ")
-                .trim();
-
-            // Move mentions to the end
-            const targets = targetUserIds
-                .map(id => `<@${id}>`)
-                .join(" ");
-
-            message.content = buildMessage(
-                cleanContent,
-                targets
-            );
-
-            return;
-        }
-
-        // --------------------------------
-        // AUTO MENTION SAVED TARGETS
-        // --------------------------------
-
-        if (targetUserIds.length > 0) {
-            const targets = targetUserIds
-                .map(id => `<@${id}>`)
-                .join(" ");
-
-            message.content = buildMessage(
-                content,
-                targets
-            );
-
-            return;
-        }
-
-        // --------------------------------
-        // NORMAL MESSAGE
-        // --------------------------------
-
-        message.content = buildMessage(content);
-    });
-
-    // ================================
-    // SETTINGS API
-    // ================================
-
-    async function setConfig(key, value) {
-        config[key] = value;
-        await saveConfig();
-    }
-
-    // Expose config for Revenge settings/UI
-    globalThis.HotTypingZeisu = {
-        getConfig: () => ({ ...config }),
-
-        setEnableHash: value =>
-            setConfig("enableHash", Boolean(value)),
-
-        setEnableMentions: value =>
-            setConfig("enableMentions", Boolean(value)),
-
-        setIcons: value =>
-            setConfig("icons", String(value)),
-
-        setIconChance: value =>
-            setConfig(
-                "iconChance",
-                Math.max(
-                    0,
-                    Math.min(100, Number(value) || 0)
-                )
-            )
-    };
-})();
+    },
+});
