@@ -1,11 +1,16 @@
 {
-  "name": "HashPrefix",
-  "description": "Automatically adds # before Discord messages",
-  "authors": [
-    {
-      "name": "zeisu"
+  "format": 1,
+  "id": "HotTypingZeisu",
+  "name": "HotTypingZeisu",
+  "description": "Adds a customizable # prefix, automatic mentions and random icons.",
+  "author": "zeisu",
+  "version": "1.0.0",
+  "dependencies": {
+    "revenge.api": {
+      "version": ">=1 <2"
     }
-  ],
-  "main": "index.js",
-  "hash": "e3dc636c4c3f3535"
+  },
+  "dist": {
+    "script": "index.js"
+  }
 }
